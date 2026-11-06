@@ -1,0 +1,13 @@
+# Local database login: copy includes/config.example.php to includes/config.php
+includes/config.php
+
+# Database exports and imported business data
+*.sql.gz
+*.dump
+*.csv
+*.tsv
+*.xlsx
+backups/
+
+.DS_Store
+*.log
