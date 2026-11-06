@@ -475,6 +475,8 @@ select.pill { width: auto; height: 30px; margin: 0; padding: 0 6px; border: 0; b
 .hint { margin-top: 5px; font-weight: 400; }
 .form-hint { margin: -6px 0 14px; }
 .narrow { max-width: 460px; }
+.narrow + .narrow { margin-top: 16px; }
+.narrow .actions { flex-wrap: wrap; }
 
 /* Messages */
 .alert { padding: 11px 15px; margin-bottom: 16px; border-radius: 10px; }
@@ -509,6 +511,14 @@ select.pill { width: auto; height: 30px; margin: 0; padding: 0 6px; border: 0; b
 .login-form h1 { margin: 0; font: 400 36px/1.15 var(--serif); }
 .login-intro { margin: 8px 0 24px; color: var(--muted); }
 .login-form .btn { margin-top: 8px; height: 44px; }
+.qr-box { width: 200px; height: 200px; margin: 0 auto 12px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+.qr-box svg { display: block; width: 100%; height: 100%; }
+.manual-key { margin-bottom: 16px; color: var(--muted); font-size: 14px; }
+.manual-key summary { cursor: pointer; text-align: center; }
+.manual-key p { margin: 8px 0 4px; }
+.manual-key code { display: block; color: var(--ink); font-size: 13px; overflow-wrap: anywhere; }
+.code-input { font-variant-numeric: tabular-nums; letter-spacing: .08em; }
+.recovery-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; margin: 14px 0; padding: 0; list-style: none; font: 15px/1.5 ui-monospace, Menlo, Consolas, monospace; }
 .password-field { position: relative; display: block; }
 .password-field input { padding-right: 42px; }
 .password-field .icon-btn { position: absolute; right: 3px; top: 3px; color: var(--muted); }

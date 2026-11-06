@@ -434,7 +434,7 @@ function layout_bottom(): void
 function sign_in(array $user): void
 {
     session_regenerate_id(true);
-    unset($_SESSION['csrf']);
+    unset($_SESSION['csrf'], $_SESSION['pending']);
     $_SESSION['user_id']         = (int) $user['id'];
     $_SESSION['session_version'] = (int) $user['session_version'];
     $_SESSION['last_seen']       = time();
@@ -500,15 +500,17 @@ function set_password(int $user_id, string $password): void
 
 // Every page needs a signed-in user, except those that declare themselves public.
 // The account is re-read on each request so that deleting a user, changing a role
-// or resetting a password takes effect straight away.
+// or resetting a password takes effect straight away. An account without
+// two-factor is sent back to sign in, which makes the user set it up.
 if (!defined('PUBLIC_PAGE')) {
     $account = false;
     if (signed_in()) {
-        $find = db()->prepare('SELECT username, role, session_version FROM users WHERE id = ?');
+        $find = db()->prepare('SELECT username, role, session_version, totp_secret FROM users WHERE id = ?');
         $find->execute([$_SESSION['user_id']]);
         $account = $find->fetch();
     }
-    if (!$account || (int) $account['session_version'] !== (int) ($_SESSION['session_version'] ?? 0)) {
+    if (!$account || $account['totp_secret'] === null
+        || (int) $account['session_version'] !== (int) ($_SESSION['session_version'] ?? 0)) {
         sign_out();
         redirect('login.php');
     }

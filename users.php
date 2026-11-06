@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/includes/bootstrap.php';
+require __DIR__ . '/includes/two_factor.php';
 require_admin();
 
 $me     = (int) $_SESSION['user_id'];
@@ -17,6 +18,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             db()->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
             flash('User deleted.');
+        }
+        redirect('users.php');
+    }
+
+    if (post('action') === 'reset_two_factor') {
+        if ($id === $me) {
+            flash('Use My account to change your own two-factor settings.', 'error');
+        } else {
+            clear_two_factor($id);
+            flash('Two-factor reset. That user will set it up again at their next sign-in.');
         }
         redirect('users.php');
     }
@@ -67,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $form = $find->fetch() ?: $blank;
 }
 
-$users  = db()->query('SELECT id, username, role FROM users ORDER BY role, username')->fetchAll();
+$users  = db()->query('SELECT id, username, role, totp_secret IS NOT NULL AS has_two_factor FROM users ORDER BY role, username')->fetchAll();
 $admins = count(array_filter($users, fn($user) => $user['role'] === 'Admin'));
 
 layout_top('Users', 'users');
@@ -115,7 +126,16 @@ hero('Users', 'Choose who can sign in and what they can do.');
                     <span class="avatar"><?= h(monogram($user['username'])) ?></span>
                     <span class="user-name"><?= h($user['username']) ?><?php if ((int) $user['id'] === $me): ?> <em>You</em><?php endif; ?></span>
                     <span class="badge badge-<?= h(strtolower($user['role'])) ?>"><?= icon($user['role'] === 'Admin' ? 'shield' : 'direct') ?><?= h($user['role']) ?></span>
+                    <span class="badge badge-<?= $user['has_two_factor'] ? 'ok' : 'none' ?>"><?= $user['has_two_factor'] ? '2FA on' : '2FA not set up' ?></span>
                     <span class="row-actions">
+                        <?php if ($user['has_two_factor'] && (int) $user['id'] !== $me): ?>
+                            <form method="post" data-confirm="Reset two-factor for <?= h($user['username']) ?>? They will be signed out and must set it up again.">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="action" value="reset_two_factor">
+                                <input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
+                                <button class="icon-link" title="Reset two-factor" aria-label="Reset two-factor for <?= h($user['username']) ?>"><?= icon('shield') ?></button>
+                            </form>
+                        <?php endif; ?>
                         <a class="icon-link" href="?edit=<?= (int) $user['id'] ?>" title="Edit" aria-label="Edit <?= h($user['username']) ?>"><?= icon('edit') ?></a>
                         <?php if ((int) $user['id'] !== $me): ?>
                             <form method="post" data-confirm="Delete user <?= h($user['username']) ?>?">

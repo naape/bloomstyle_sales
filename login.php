@@ -1,6 +1,7 @@
 <?php
 const PUBLIC_PAGE = true;
 require __DIR__ . '/includes/bootstrap.php';
+require __DIR__ . '/includes/two_factor.php';
 
 if (signed_in()) {
     redirect('index.php');
@@ -24,8 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$errors) {
             db()->prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'Admin')")
                 ->execute([$username, password_hash($password, PASSWORD_DEFAULT)]);
-            sign_in(['id' => db()->lastInsertId(), 'session_version' => 0]);
-            redirect('index.php');
+            begin_two_factor(['id' => db()->lastInsertId(), 'session_version' => 0]);
         }
     } else {
         $recent = db()->prepare('SELECT COUNT(*) FROM login_attempts
@@ -41,8 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($user && password_verify($password, $user['password_hash'])) {
                 db()->prepare('DELETE FROM login_attempts WHERE ip = ?')->execute([$ip]);
-                sign_in($user);
-                redirect('index.php');
+                begin_two_factor($user);
             }
             db()->prepare('INSERT INTO login_attempts (ip, attempted_at) VALUES (?, NOW())')->execute([$ip]);
             $errors[] = 'Incorrect username or password.';
