@@ -17,7 +17,7 @@ function showTip(value, title, detail, x, y) {
 }
 const hideTip = () => { tip.hidden = true; };
 
-document.querySelectorAll('.rank li').forEach((row) => {
+document.querySelectorAll('.rank li, .pie-slice, .split-part').forEach((row) => {
     const show = (x, y) => showTip(row.dataset.tipValue, row.dataset.tipTitle, row.dataset.tipDetail, x, y);
     row.addEventListener('pointermove', (event) => show(event.clientX, event.clientY));
     row.addEventListener('pointerleave', hideTip);
@@ -28,7 +28,7 @@ document.querySelectorAll('.rank li').forEach((row) => {
     row.addEventListener('blur', hideTip);
 });
 
-// Monthly trend: a line with a crosshair that snaps to the nearest month.
+// Monthly trend: sales and profit lines, with a crosshair that snaps to the nearest month.
 const holder = document.getElementById('trend');
 const source = document.getElementById('trend-data');
 
@@ -52,21 +52,23 @@ if (holder && source) {
         const rounded = [1, 2, 2.5, 5, 10].map((n) => n * step).find((n) => n >= value);
         return rounded ?? 10 * step;
     };
-    const tick = (n) => (n >= 1000 ? `${n / 1000}K` : String(n));
+    const tick = (n) => (Math.abs(n) >= 1000 ? `${Math.round(n / 100) / 10}K` : String(Math.round(n)));
 
     const draw = () => {
         const width = holder.clientWidth;
         const plotW = width - pad.left - pad.right;
         const plotH = height - pad.top - pad.bottom;
-        const top = niceMax(Math.max(...data.map((row) => row.revenue)));
+        const top = niceMax(Math.max(...data.map((row) => Math.max(row.revenue, row.profit))));
+        const lowest = Math.min(0, ...data.map((row) => row.profit));
+        const bottom = lowest < 0 ? -niceMax(-lowest) : 0;   // a month at a loss dips below zero
         const x = (i) => pad.left + (data.length > 1 ? (i / (data.length - 1)) * plotW : plotW / 2);
-        const y = (value) => pad.top + plotH - (value / top) * plotH;
+        const y = (value) => pad.top + plotH - ((value - bottom) / (top - bottom)) * plotH;
 
         holder.replaceChildren();
         const svg = shape('svg', { width, height, viewBox: `0 0 ${width} ${height}`, 'aria-hidden': 'true' }, holder);
 
         for (let i = 0; i <= 4; i++) {
-            const value = (top / 4) * i;
+            const value = bottom + ((top - bottom) / 4) * i;
             shape('line', { class: 'grid', x1: pad.left, x2: width - pad.right, y1: y(value), y2: y(value) }, svg);
             shape('text', { class: 'axis', x: pad.left - 8, y: y(value) + 4, 'text-anchor': 'end' }, svg).textContent = tick(value);
         }
@@ -80,14 +82,18 @@ if (holder && source) {
             }
         });
 
+        if (bottom < 0) shape('line', { class: 'zero', x1: pad.left, x2: width - pad.right, y1: y(0), y2: y(0) }, svg);
+
         const points = data.map((row, i) => `${x(i)},${y(row.revenue)}`);
+        const profits = data.map((row, i) => `${x(i)},${y(row.profit)}`);
         if (data.length > 1) {
-            const base = pad.top + plotH;
-            shape('polygon', { class: 'area', points: `${x(0)},${base} ${points.join(' ')} ${x(data.length - 1)},${base}` }, svg);
+            shape('polygon', { class: 'area', points: `${x(0)},${y(0)} ${points.join(' ')} ${x(data.length - 1)},${y(0)}` }, svg);
             shape('polyline', { class: 'line', points: points.join(' ') }, svg);
+            shape('polyline', { class: 'line line-profit', points: profits.join(' ') }, svg);
         }
 
         const cross = shape('line', { class: 'cross', y1: pad.top, y2: pad.top + plotH }, svg);
+        const dotProfit = shape('circle', { class: 'dot dot-profit', r: 5 }, svg);
         const dot = shape('circle', { class: 'dot', r: 5 }, svg);
 
         place = (i, show) => {
@@ -97,10 +103,13 @@ if (holder && source) {
             cross.setAttribute('x2', x(i));
             dot.setAttribute('cx', x(i));
             dot.setAttribute('cy', y(row.revenue));
+            dotProfit.setAttribute('cx', x(i));
+            dotProfit.setAttribute('cy', y(row.profit));
             cross.style.visibility = show ? 'visible' : 'hidden';
             if (show) {
                 const box = svg.getBoundingClientRect();
-                showTip(rupees(row.revenue), row.label, `${row.orders} orders · ${row.units} units`, box.left + x(i), box.top + y(row.revenue));
+                showTip(`${rupees(row.revenue)} sales`, row.label,
+                    `${rupees(row.profit)} profit · ${row.orders} orders · ${row.units} units`, box.left + x(i), box.top + y(row.revenue));
             }
         };
         place(active, false);

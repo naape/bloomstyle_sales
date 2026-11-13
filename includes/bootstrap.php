@@ -384,6 +384,10 @@ function icon(string $name): string
         'users'    => 'M9 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M2 21a7 7 0 0 1 14 0 M16 4.5a4 4 0 0 1 0 7 M18 14.5a7 7 0 0 1 4 6.5',
         'shield'   => 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z M9 12l2 2 4-4',
         'waybill'  => 'M4 4h16v16H4z M8 8v8 M11 8v8 M14 8v8 M17 8v8',
+        'truck'    => 'M3 6h11v10H3z M14 10h4l3 3v3h-7 M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+        'return'   => 'M9 14l-5-5 5-5 M4 9h11a5 5 0 0 1 0 10h-3',
+        'x'        => 'M6 6l12 12 M18 6L6 18',
+        'calendar' => 'M4 6h16v14H4z M4 10h16 M8 3v4 M16 3v4',
         'eye'      => 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
     ];
     return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
