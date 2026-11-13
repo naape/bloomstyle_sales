@@ -311,11 +311,16 @@ function waybill_range(string $first, string $last): array|string
     return $numbers;
 }
 
+/*
+ * Waybill numbers are matched to sales.waybill_no as bytes (CAST ... AS BINARY), so the
+ * waybills table works whatever collation the sales table was created with.
+ */
+
 /** Waybill numbers that are in a range and not on any sale, lowest first. */
 function available_waybills(): array
 {
     return db()->query('SELECT w.number FROM waybills w
-                        WHERE NOT EXISTS (SELECT 1 FROM sales s WHERE s.waybill_no = w.number)
+                        WHERE NOT EXISTS (SELECT 1 FROM sales s WHERE s.waybill_no = CAST(w.number AS BINARY))
                         ORDER BY LENGTH(w.number), w.number')->fetchAll(PDO::FETCH_COLUMN);
 }
 

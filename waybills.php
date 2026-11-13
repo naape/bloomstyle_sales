@@ -55,7 +55,7 @@ $ranges = db()->query('SELECT r.*, COUNT(w.number) AS total, COUNT(s.waybill_no)
                               MIN(CASE WHEN s.waybill_no IS NULL THEN LPAD(w.number, 50, " ") END) AS next_no
                        FROM waybill_ranges r
                        JOIN waybills w ON w.range_id = r.id
-                       LEFT JOIN (SELECT DISTINCT waybill_no FROM sales) s ON s.waybill_no = w.number
+                       LEFT JOIN (SELECT DISTINCT waybill_no FROM sales) s ON s.waybill_no = CAST(w.number AS BINARY)
                        GROUP BY r.id
                        ORDER BY r.created_at DESC, r.id DESC')->fetchAll();
 $total = array_sum(array_column($ranges, 'total'));

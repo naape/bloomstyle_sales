@@ -38,8 +38,7 @@ CREATE TABLE IF NOT EXISTS sales (
     status          VARCHAR(30)   NOT NULL,
     referral_type   VARCHAR(30)   NOT NULL,
     cash_status     VARCHAR(30)   NOT NULL,
-    INDEX idx_sales_date (date),
-    INDEX idx_sales_waybill (waybill_no)
+    INDEX idx_sales_date (date)
 ) ENGINE=InnoDB;
 
 -- Waybill numbers bought from the courier. A number is free until a sale uses it.
