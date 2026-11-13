@@ -278,6 +278,47 @@ function item_label(string $code, string $item_no): string
     return implode(', ', array_map(fn($number) => $code . '-' . $number, explode(', ', $item_no)));
 }
 
+const MAX_WAYBILL_RANGE = 1000;  // numbers one range may add
+
+/**
+ * The waybill numbers from $first to $last, keeping any letter prefix and leading zeros:
+ * "CB0098" to "CB0101" gives CB0098, CB0099, CB0100, CB0101. A blank $last adds only $first.
+ * Returns an error message instead when the range is not valid.
+ */
+function waybill_range(string $first, string $last): array|string
+{
+    $last = $last === '' ? $first : $last;
+    if (!preg_match('/^([A-Za-z]*)([0-9]{1,15})$/', $first, $from) || !preg_match('/^([A-Za-z]*)([0-9]{1,15})$/', $last, $to)) {
+        return 'A waybill number is digits, with an optional letter prefix such as CB. Spaces and dashes are not allowed.';
+    }
+    if (strcasecmp($from[1], $to[1]) !== 0) {
+        return 'The first and last numbers must have the same letter prefix.';
+    }
+    $start = (int) $from[2];
+    $end   = (int) $to[2];
+    if ($end < $start) {
+        return 'The last number must be the same as or after the first number.';
+    }
+    if ($end - $start + 1 > MAX_WAYBILL_RANGE) {
+        return 'One range can hold up to ' . MAX_WAYBILL_RANGE . ' numbers. Split it into smaller ranges.';
+    }
+    $prefix = strtoupper($from[1]);
+    $width  = strlen($from[2]);
+    $numbers = [];
+    for ($n = $start; $n <= $end; $n++) {
+        $numbers[] = $prefix . str_pad((string) $n, $width, '0', STR_PAD_LEFT);
+    }
+    return $numbers;
+}
+
+/** Waybill numbers that are in a range and not on any sale, lowest first. */
+function available_waybills(): array
+{
+    return db()->query('SELECT w.number FROM waybills w
+                        WHERE NOT EXISTS (SELECT 1 FROM sales s WHERE s.waybill_no = w.number)
+                        ORDER BY LENGTH(w.number), w.number')->fetchAll(PDO::FETCH_COLUMN);
+}
+
 function slug(string $value): string
 {
     return strtolower(str_replace(' ', '-', $value));
@@ -337,6 +378,7 @@ function icon(string $name): string
         'chart'    => 'M3 20h18 M6 20v-7 M12 20V5 M18 20v-11',
         'users'    => 'M9 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M2 21a7 7 0 0 1 14 0 M16 4.5a4 4 0 0 1 0 7 M18 14.5a7 7 0 0 1 4 6.5',
         'shield'   => 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z M9 12l2 2 4-4',
+        'waybill'  => 'M4 4h16v16H4z M8 8v8 M11 8v8 M14 8v8 M17 8v8',
         'eye'      => 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
     ];
     return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
@@ -423,6 +465,7 @@ function layout_top(string $title, string $section): void
         'sales' => ['index.php', 'Sales', 'sales'],
         'stock' => ['stock.php', 'Stock', 'box'],
         'items' => ['items.php', 'Items', 'tag'],
+        'waybills' => ['waybills.php', 'Waybills', 'waybill'],
     ];
     if (is_admin()) {
         $nav['accounts'] = ['accounts.php', 'Accounts', 'wallet'];

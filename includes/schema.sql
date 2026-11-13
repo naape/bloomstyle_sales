@@ -38,7 +38,24 @@ CREATE TABLE IF NOT EXISTS sales (
     status          VARCHAR(30)   NOT NULL,
     referral_type   VARCHAR(30)   NOT NULL,
     cash_status     VARCHAR(30)   NOT NULL,
-    INDEX idx_sales_date (date)
+    INDEX idx_sales_date (date),
+    INDEX idx_sales_waybill (waybill_no)
+) ENGINE=InnoDB;
+
+-- Waybill numbers bought from the courier. A number is free until a sale uses it.
+CREATE TABLE IF NOT EXISTS waybill_ranges (
+    id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    first_no   VARCHAR(50)  NOT NULL,
+    last_no    VARCHAR(50)  NOT NULL,
+    note       VARCHAR(255) NOT NULL DEFAULT '',
+    created_by VARCHAR(50)  NOT NULL DEFAULT '',
+    created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS waybills (
+    number   VARCHAR(50)  NOT NULL PRIMARY KEY,
+    range_id INT UNSIGNED NOT NULL,
+    FOREIGN KEY (range_id) REFERENCES waybill_ranges(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS sale_items (

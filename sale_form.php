@@ -38,6 +38,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = "Order number {$form['order_no']} already exists.";
         }
     }
+    if ($form['waybill_no'] !== '') {
+        // A waybill must come from the Waybills page and not be on another sale. A sale saved
+        // before its waybill was listed there keeps the number it already has.
+        $kept = db()->prepare('SELECT waybill_no FROM sales WHERE id = ?');
+        $kept->execute([$form['id']]);
+        $listed = db()->prepare('SELECT 1 FROM waybills WHERE number = ?');
+        $listed->execute([$form['waybill_no']]);
+        $used = db()->prepare('SELECT 1 FROM sales WHERE waybill_no = ? AND id <> ?');
+        $used->execute([$form['waybill_no'], $form['id']]);
+        if ($used->fetchColumn()) {
+            $errors[] = "Waybill {$form['waybill_no']} is already used on another sale.";
+        } elseif ($kept->fetchColumn() !== $form['waybill_no'] && !$listed->fetchColumn()) {
+            $errors[] = "Waybill {$form['waybill_no']} is not in your waybill numbers. Add it on the Waybills page.";
+        }
+    }
     if ($form['invoice_no'] !== '') {
         $duplicate = db()->prepare('SELECT 1 FROM sales WHERE invoice_no = ? AND id <> ?');
         $duplicate->execute([$form['invoice_no'], $form['id']]);
@@ -178,6 +193,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lines = $find->fetchAll();
 }
 
+// Unused waybills to choose from, plus this sale's own number.
+$waybills  = available_waybills();
+$available = count($waybills);
+if ($form['waybill_no'] !== '' && !in_array($form['waybill_no'], $waybills, true)) {
+    array_unshift($waybills, $form['waybill_no']);
+}
+
 /** One item row of the sale form. */
 function sale_line(array $items, array $line): string
 {
@@ -224,7 +246,13 @@ show_errors($errors);
                     <input name="invoice_no" maxlength="50" value="<?= h($form['invoice_no']) ?>" autofocus>
                 </label>
                 <label>Waybill number
-                    <input name="waybill_no" maxlength="50" value="<?= h($form['waybill_no']) ?>">
+                    <select name="waybill_no">
+                        <option value="">No waybill</option>
+                        <?php foreach ($waybills as $number): ?>
+                            <option<?= $number === $form['waybill_no'] ? ' selected' : '' ?>><?= h($number) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <small><?= $available ? $available . ' available' : 'None available' ?> · <a href="waybills.php">Add numbers</a></small>
                 </label>
             </div>
             <div class="field">
