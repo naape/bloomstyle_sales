@@ -96,9 +96,15 @@ $referrals = dashboard_query("SELECT s.referral_type, $revenue AS revenue, COUNT
 
 // Purchase cost per supplier: stock bought in the period, at the price paid.
 $stock_date_sql = str_replace('s.date', 'st.date', $date_sql);
-$suppliers = dashboard_query("SELECT st.supplier, SUM(st.total_price) AS cost, SUM(st.qty) AS units, COUNT(*) AS entries
-                              FROM stock st WHERE st.unit_price IS NOT NULL $stock_date_sql
-                              GROUP BY st.supplier ORDER BY st.supplier = '', cost DESC", $date_params);
+// Each supplier lists the items bought from them, most units first, such as "PHL 334 · SHLP-C2 6".
+$suppliers = dashboard_query("SELECT supplier, SUM(cost) AS cost, SUM(units) AS units, SUM(entries) AS entries,
+                                     GROUP_CONCAT(CONCAT(code, ' ', units) ORDER BY units DESC, code SEPARATOR ' · ') AS items
+                              FROM (SELECT st.supplier, i.code, SUM(st.total_price) AS cost, SUM(st.qty) AS units, COUNT(*) AS entries
+                                    FROM stock st JOIN items i ON i.id = st.item_id
+                                    WHERE st.unit_price IS NOT NULL $stock_date_sql
+                                    GROUP BY st.supplier, i.id, i.code) per_item
+                              GROUP BY supplier ORDER BY supplier = '', cost DESC", $date_params);
+$unrecorded = array_filter($suppliers, fn($row) => $row['supplier'] === '');
 $purchase_total = array_sum(array_column($suppliers, 'cost'));
 
 // Stock is always as of today, whatever period is selected.
@@ -233,10 +239,14 @@ hero('Dashboard', 'How your store is doing, from sales to stock.', '', true);
     <p class="chart-sub">Purchase cost in this period, from the Stock page: Rs. <?= money($purchase_total) ?> in total</p>
     <?= rank_bars(array_map(fn($row) => [
         $row['supplier'] !== '' ? $row['supplier'] : 'Supplier not recorded',
-        number_format((int) $row['units']) . ' units · ' . $row['entries'] . ($row['entries'] == 1 ? ' entry' : ' entries'),
+        number_format((int) $row['units']) . ' units: ' . $row['items'],
         (float) $row['cost'], 'Rs. ' . number_format((float) $row['cost']),
-        ($purchase_total > 0 ? number_format($row['cost'] / $purchase_total * 100, 1) : '0') . '% of purchase cost',
+        ($purchase_total > 0 ? number_format($row['cost'] / $purchase_total * 100, 1) : '0') . '% of purchase cost · '
+            . $row['entries'] . ($row['entries'] == 1 ? ' stock entry' : ' stock entries'),
     ], $suppliers)) ?>
+    <?php if ($unrecorded): ?>
+        <p class="chart-foot"><a href="stock.php?supplier=none">See the stock entries with no supplier</a> and add one to each.</p>
+    <?php endif; ?>
     <?php endif; ?>
 </section>
 

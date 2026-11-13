@@ -76,9 +76,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $items     = items_with_stock();
 $suppliers = db()->query("SELECT DISTINCT supplier FROM stock WHERE supplier <> '' ORDER BY supplier")->fetchAll(PDO::FETCH_COLUMN);
-$filter = (int) get('item');
-$where  = $filter ? 'WHERE s.item_id = ?' : '';
-$params = $filter ? [$filter] : [];
+$filter   = (int) get('item');
+$by_supplier = get('supplier');   // a supplier's name, or "none" for purchases with no supplier
+$conditions = [];
+$params     = [];
+if ($filter) {
+    $conditions[] = 's.item_id = ?';
+    $params[]     = $filter;
+}
+if ($by_supplier === 'none') {
+    $conditions[] = "s.supplier = '' AND s.unit_price IS NOT NULL";
+} elseif ($by_supplier !== '') {
+    $conditions[] = 's.supplier = ?';
+    $params[]     = $by_supplier;
+}
+$where   = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+$filters = array_filter(['item' => $filter ?: '', 'supplier' => $by_supplier], fn($value) => $value !== '');
 
 $totals = db()->prepare("SELECT COUNT(*) AS entries, COALESCE(SUM(CASE WHEN unit_price IS NOT NULL THEN qty END), 0) AS qty,
                                 COALESCE(SUM(total_price), 0) AS cost
@@ -163,9 +176,18 @@ $average = $totals['qty'] > 0 ? $totals['cost'] / $totals['qty'] : 0;
                     <?php endforeach; ?>
                 </select>
             </label>
+            <label>Supplier
+                <select name="supplier" data-autosubmit>
+                    <option value="">All suppliers</option>
+                    <option value="none"<?= $by_supplier === 'none' ? ' selected' : '' ?>>Not recorded</option>
+                    <?php foreach ($suppliers as $name): ?>
+                        <option value="<?= h($name) ?>"<?= $name === $by_supplier ? ' selected' : '' ?>><?= h($name) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
         </form>
         <?php if (!$rows): ?>
-            <?= empty_state('No stock entries yet.') ?>
+            <?= empty_state($where ? 'No stock entries match.' : 'No stock entries yet.') ?>
         <?php else: ?>
         <div class="table-wrap">
             <table>
@@ -198,7 +220,7 @@ $average = $totals['qty'] > 0 ? $totals['cost'] / $totals['qty'] : 0;
                 </tbody>
             </table>
         </div>
-        <?= pager($page, $pages, $filter ? ['item' => $filter] : []) ?>
+        <?= pager($page, $pages, $filters) ?>
         <?php endif; ?>
     </section>
 </div>
