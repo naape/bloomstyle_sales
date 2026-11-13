@@ -585,3 +585,5 @@ select.pill { width: auto; height: 30px; margin: 0; padding: 0 6px; border: 0; b
     .product { transition: none; }
     .product:hover { transform: none; }
 }
+.supplier-card { margin-top: 20px; }
+.supplier-card .card-head { padding: 0 0 2px; }

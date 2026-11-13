@@ -94,6 +94,13 @@ $provinces = dashboard_query("SELECT s.province, $revenue AS revenue, COUNT(DIST
 $referrals = dashboard_query("SELECT s.referral_type, $revenue AS revenue, COUNT(DISTINCT s.id) AS orders
                               $sold GROUP BY s.referral_type ORDER BY orders DESC", $date_params);
 
+// Purchase cost per supplier: stock bought in the period, at the price paid.
+$stock_date_sql = str_replace('s.date', 'st.date', $date_sql);
+$suppliers = dashboard_query("SELECT st.supplier, SUM(st.total_price) AS cost, SUM(st.qty) AS units, COUNT(*) AS entries
+                              FROM stock st WHERE st.unit_price IS NOT NULL $stock_date_sql
+                              GROUP BY st.supplier ORDER BY st.supplier = '', cost DESC", $date_params);
+$purchase_total = array_sum(array_column($suppliers, 'cost'));
+
 // Stock is always as of today, whatever period is selected.
 $units_in_stock = 0;
 $stock_value    = 0;
@@ -214,6 +221,24 @@ hero('Dashboard', 'How your store is doing, from sales to stock.', '', true);
         </section>
     </div>
 <?php endif; ?>
+
+<section class="card chart-card supplier-card">
+    <div class="card-head">
+        <h2>Purchases by supplier</h2>
+        <a href="stock.php">View stock entries</a>
+    </div>
+    <?php if (!$suppliers): ?>
+        <?= empty_state('No stock bought in this period.') ?>
+    <?php else: ?>
+    <p class="chart-sub">Purchase cost in this period, from the Stock page: Rs. <?= money($purchase_total) ?> in total</p>
+    <?= rank_bars(array_map(fn($row) => [
+        $row['supplier'] !== '' ? $row['supplier'] : 'Supplier not recorded',
+        number_format((int) $row['units']) . ' units · ' . $row['entries'] . ($row['entries'] == 1 ? ' entry' : ' entries'),
+        (float) $row['cost'], 'Rs. ' . number_format((float) $row['cost']),
+        ($purchase_total > 0 ? number_format($row['cost'] / $purchase_total * 100, 1) : '0') . '% of purchase cost',
+    ], $suppliers)) ?>
+    <?php endif; ?>
+</section>
 
 <h2 class="section-title">Stock today <small>Not affected by the period above</small></h2>
 <dl class="stats stats-flat stats-2">

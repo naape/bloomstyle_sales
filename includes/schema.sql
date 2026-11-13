@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS stock (
     id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     date        DATE          NOT NULL,
     item_id     INT UNSIGNED  NOT NULL,
+    supplier    VARCHAR(100)  NOT NULL DEFAULT '',
     qty         INT           NOT NULL,
     unit_price  DECIMAL(10,2) NULL,
     total_price DECIMAL(16,2) NOT NULL,

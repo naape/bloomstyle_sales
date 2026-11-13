@@ -2,7 +2,7 @@
 require __DIR__ . '/includes/bootstrap.php';
 
 $errors = [];
-$blank  = ['id' => 0, 'date' => date('Y-m-d'), 'item_id' => 0, 'qty' => '', 'unit_price' => '', 'note' => ''];
+$blank  = ['id' => 0, 'date' => date('Y-m-d'), 'item_id' => 0, 'supplier' => '', 'qty' => '', 'unit_price' => '', 'note' => ''];
 $form   = $blank;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('stock.php');
     }
 
-    $form = ['id' => $id, 'date' => post('date'), 'item_id' => (int) post('item_id'),
+    $form = ['id' => $id, 'date' => post('date'), 'item_id' => (int) post('item_id'), 'supplier' => post('supplier'),
              'qty' => post('qty'), 'unit_price' => post('unit_price'), 'note' => post('note')];
     $qty      = parse_stock_qty($form['qty']);
     $has_unit = $form['unit_price'] !== '';
@@ -45,27 +45,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (mb_strlen($form['note']) > 255) {
         $errors[] = 'The note is too long.';
     }
+    if (mb_strlen($form['supplier']) > 100) {
+        $errors[] = 'The supplier name is too long.';
+    }
+    // Use the spelling already on record, so one supplier is not split into two.
+    if ($form['supplier'] !== '') {
+        $known = db()->prepare('SELECT supplier FROM stock WHERE supplier = ? LIMIT 1');
+        $known->execute([$form['supplier']]);
+        $form['supplier'] = $known->fetchColumn() ?: $form['supplier'];
+    }
 
     if (!$errors) {
-        $values = [$form['date'], $form['item_id'], $qty, $unit, round($qty * ($unit ?? 0), 2), $form['note']];
+        $values = [$form['date'], $form['item_id'], $form['supplier'], $qty, $unit, round($qty * ($unit ?? 0), 2), $form['note']];
         if ($id) {
-            db()->prepare('UPDATE stock SET date = ?, item_id = ?, qty = ?, unit_price = ?, total_price = ?, note = ? WHERE id = ?')
+            db()->prepare('UPDATE stock SET date = ?, item_id = ?, supplier = ?, qty = ?, unit_price = ?, total_price = ?, note = ? WHERE id = ?')
                 ->execute([...$values, $id]);
             flash('Stock entry updated.');
         } else {
-            db()->prepare('INSERT INTO stock (date, item_id, qty, unit_price, total_price, note) VALUES (?, ?, ?, ?, ?, ?)')
+            db()->prepare('INSERT INTO stock (date, item_id, supplier, qty, unit_price, total_price, note) VALUES (?, ?, ?, ?, ?, ?, ?)')
                 ->execute($values);
             flash('Stock entry saved.');
         }
         redirect('stock.php');
     }
 } elseif (get('edit') !== '') {
-    $find = db()->prepare('SELECT id, date, item_id, qty, unit_price, note FROM stock WHERE id = ?');
+    $find = db()->prepare('SELECT id, date, item_id, supplier, qty, unit_price, note FROM stock WHERE id = ?');
     $find->execute([(int) get('edit')]);
     $form = $find->fetch() ?: $blank;
 }
 
-$items  = items_with_stock();
+$items     = items_with_stock();
+$suppliers = db()->query("SELECT DISTINCT supplier FROM stock WHERE supplier <> '' ORDER BY supplier")->fetchAll(PDO::FETCH_COLUMN);
 $filter = (int) get('item');
 $where  = $filter ? 'WHERE s.item_id = ?' : '';
 $params = $filter ? [$filter] : [];
@@ -114,6 +124,12 @@ $average = $totals['qty'] > 0 ? $totals['cost'] / $totals['qty'] : 0;
             <label>Description
                 <input name="description" readonly tabindex="-1">
             </label>
+            <label>Supplier
+                <input name="supplier" maxlength="100" value="<?= h($form['supplier']) ?>" list="suppliers" autocomplete="off" placeholder="Who you bought it from">
+                <datalist id="suppliers">
+                    <?php foreach ($suppliers as $supplier): ?><option value="<?= h($supplier) ?>"><?php endforeach; ?>
+                </datalist>
+            </label>
             <div class="row-2">
                 <label>Qty purchased
                     <input type="number" name="qty" min="-<?= MAX_QTY ?>" max="<?= MAX_QTY ?>" step="1" value="<?= h($form['qty']) ?>" required>
@@ -127,7 +143,7 @@ $average = $totals['qty'] > 0 ? $totals['cost'] / $totals['qty'] : 0;
                 <input id="total" class="total" readonly tabindex="-1">
             </label>
             <label>Note
-                <input name="note" maxlength="255" value="<?= h($form['note']) ?>" placeholder="Supplier, damage or replacement">
+                <input name="note" maxlength="255" value="<?= h($form['note']) ?>" placeholder="Damage, replacement or other details">
             </label>
             <div class="actions">
                 <button class="btn btn-primary"><?= $form['id'] ? 'Save changes' : 'Save stock' ?></button>
@@ -163,7 +179,7 @@ $average = $totals['qty'] > 0 ? $totals['cost'] / $totals['qty'] : 0;
                         <td><span class="date-chip"><b><?= date('d', strtotime($row['date'])) ?></b><?= date('M Y', strtotime($row['date'])) ?></span></td>
                         <td>
                             <span class="strong"><?= h($row['code']) ?></span>
-                            <small><?= h($row['note'] !== '' ? $row['note'] : $row['description']) ?></small>
+                            <small><?= h(implode(' · ', array_filter([$row['supplier'], $row['note'] !== '' ? $row['note'] : $row['description']]))) ?></small>
                         </td>
                         <td class="num<?= $row['qty'] < 0 ? ' negative' : '' ?>"><?= (int) $row['qty'] ?></td>
                         <td class="num"><?= $row['unit_price'] === null ? '–' : money($row['unit_price']) ?></td>
