@@ -142,5 +142,5 @@ if ($report === 'pl') {
     <?php endif;
 }
 ?>
-<script src="assets/accounts.js" defer></script>
+<script src="<?= asset('accounts.js') ?>" defer></script>
 <?php layout_bottom();

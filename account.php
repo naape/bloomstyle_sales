@@ -114,5 +114,5 @@ hero('My account', 'Signed in as ' . $_SESSION['username'] . ' (' . $_SESSION['r
         <button class="btn btn-primary">Change password</button>
     </form>
 </section>
-<script src="assets/two_factor.js" defer></script>
+<script src="<?= asset('two_factor.js') ?>" defer></script>
 <?php layout_bottom();

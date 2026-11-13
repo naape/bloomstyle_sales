@@ -4,8 +4,9 @@ require __DIR__ . '/includes/bootstrap.php';
 $items   = items_with_stock();
 $known   = array_column($items, 'code', 'id');
 $costs   = array_column($items, 'cost_price', 'id');
+$prices  = array_column($items, 'selling_price', 'id');
 $errors  = [];
-$blank_line = ['item_id' => 0, 'qty' => '1', 'unit_price' => ''];
+$blank_line = ['item_id' => 0, 'item_no' => '', 'qty' => '1', 'unit_price' => ''];
 $form = [
     'id' => 0, 'date' => date('Y-m-d'), 'order_no' => '', 'invoice_no' => '', 'waybill_no' => '', 'customer_name' => '',
     'address' => '', 'mobile' => '',
@@ -57,31 +58,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Select a district.';
     }
 
-    // Item rows: each must be a known item, listed once, with a valid quantity and price.
+    // Item rows: each must be a known item with a valid quantity and price. An item may be on
+    // several rows, but each of its piece numbers only once.
     $item_ids = post_list('item_id');
+    $item_nos = post_list('item_no');
     $qtys     = post_list('qty');
-    $prices   = post_list('unit_price');
+    $unit_prices = post_list('unit_price');
     $lines    = [];
     $saved    = [];
+    $pieces   = [];
     foreach ($item_ids as $index => $item_id) {
         $item_id = (int) $item_id;
         $qty     = parse_qty($qtys[$index] ?? '');
-        $price   = parse_amount($prices[$index] ?? '', 4);
+        // A blank price takes the item's selling price.
+        $price_text = $unit_prices[$index] ?? '';
+        if ($price_text === '' && isset($prices[$item_id])) {
+            $price_text = (string) $prices[$item_id];
+        }
+        $price   = parse_amount($price_text, 4);
         $row     = 'Item row ' . ($index + 1);
-        $lines[] = ['item_id' => $item_id, 'qty' => $qtys[$index] ?? '', 'unit_price' => $prices[$index] ?? ''];
+        $lines[] = ['item_id' => $item_id, 'item_no' => $item_nos[$index] ?? '', 'qty' => $qtys[$index] ?? '', 'unit_price' => $price_text];
+        $numbers = [];
 
         if (!isset($known[$item_id])) {
             $errors[] = "$row: select an item code.";
-        } elseif (isset($saved[$item_id])) {
-            $errors[] = "{$known[$item_id]} is listed twice. Use one row and increase its qty.";
+        } else {
+            $numbers = parse_item_numbers($item_nos[$index] ?? '', $known[$item_id]);
+            if ($numbers === null) {
+                $errors[] = "$row: item numbers can use letters, digits, / . and -. Separate two numbers with a comma.";
+                $numbers  = [];
+            } elseif (count(array_unique(array_map('strtoupper', $numbers))) !== count($numbers)) {
+                $errors[] = "$row: the same item number is entered twice.";
+            } elseif ($repeated = array_intersect_key($pieces[$item_id] ?? [], array_flip(array_map('strtoupper', $numbers)))) {
+                $errors[] = "$row: " . item_label($known[$item_id], implode(', ', $repeated)) . ' is already on another row.';
+            } elseif ($numbers && $qty !== null && count($numbers) !== $qty) {
+                $errors[] = "$row: qty is $qty but " . count($numbers) . ' item ' . (count($numbers) === 1 ? 'number is' : 'numbers are')
+                    . ' entered. Enter one number for each piece.';
+            }
         }
         if ($qty === null) {
             $errors[] = "$row: qty must be a whole number of at least 1.";
         }
-        if ($price === null) {
+        if ($price_text === '' && isset($known[$item_id])) {
+            $errors[] = "$row: {$known[$item_id]} has no selling price. Enter the price, or set it on the Items page.";
+        } elseif ($price === null) {
             $errors[] = "$row: enter a valid product price.";
         }
-        $saved[$item_id] = [$qty, $price];
+        foreach ($numbers as $number) {
+            $pieces[$item_id][strtoupper($number)] = $number;
+        }
+        $saved[] = [$item_id, $qty, $price, implode(', ', $numbers)];
     }
     if (!$lines) {
         $errors[] = 'Add at least one item.';
@@ -129,9 +155,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ->execute($values);
             $sale_id = (int) db()->lastInsertId();
         }
-        $add_line = db()->prepare('INSERT INTO sale_items (sale_id, item_id, qty, unit_price, unit_cost) VALUES (?, ?, ?, ?, ?)');
-        foreach ($saved as $item_id => [$qty, $price]) {
-            $add_line->execute([$sale_id, $item_id, $qty, $price, $sold_costs[$item_id] ?? $costs[$item_id] ?? null]);
+        $add_line = db()->prepare('INSERT INTO sale_items (sale_id, item_id, item_no, qty, unit_price, unit_cost) VALUES (?, ?, ?, ?, ?, ?)');
+        foreach ($saved as [$item_id, $qty, $price, $item_no]) {
+            $add_line->execute([$sale_id, $item_id, $item_no, $qty, $price, $sold_costs[$item_id] ?? $costs[$item_id] ?? null]);
         }
         db()->commit();
         flash($form['id'] ? 'Sale updated.' : 'Sale saved.');
@@ -147,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $form = array_intersect_key($sale, $form);
 
-    $find = db()->prepare('SELECT item_id, qty, unit_price FROM sale_items WHERE sale_id = ? ORDER BY id');
+    $find = db()->prepare('SELECT item_id, item_no, qty, unit_price FROM sale_items WHERE sale_id = ? ORDER BY id');
     $find->execute([$sale['id']]);
     $lines = $find->fetchAll();
 }
@@ -162,9 +188,10 @@ function sale_line(array $items, array $line): string
     return '<div class="line">'
         . '<label>Item code<select name="item_id[]" required><option value="">Select…</option>'
         . item_options($items, (int) $line['item_id']) . '</select><small class="line-stock"></small></label>'
-        . '<label class="line-desc">Description<input class="line-description" readonly tabindex="-1"></label>'
+        . '<label class="line-no">Item number<input name="item_no[]" maxlength="255" value="' . h($line['item_no']) . '" placeholder="e.g. 101" autocomplete="off">'
+        . '<small class="line-code"></small></label>'
         . '<label>Qty<input type="number" name="qty[]" min="1" max="' . MAX_QTY . '" step="1" value="' . h($line['qty']) . '" required></label>'
-        . '<label>Price each (Rs.)<input type="number" name="unit_price[]" min="0" max="' . MAX_AMOUNT . '" step="any" value="' . h($price) . '" required></label>'
+        . '<label>Price each (Rs.)<input type="number" name="unit_price[]" min="0" max="' . MAX_AMOUNT . '" step="any" value="' . h($price) . '"></label>'
         . '<div class="line-total"><span class="field-label">Line total</span><output class="line-amount"></output></div>'
         . '<button type="button" class="icon-link danger line-remove" title="Remove item" aria-label="Remove item">' . icon('trash') . '</button>'
         . '</div>';

@@ -45,10 +45,11 @@ CREATE TABLE IF NOT EXISTS sale_items (
     id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     sale_id    INT UNSIGNED  NOT NULL,
     item_id    INT UNSIGNED  NOT NULL,
+    item_no    VARCHAR(255)  NOT NULL DEFAULT '',
     qty        INT UNSIGNED  NOT NULL,
     unit_price DECIMAL(12,4) NOT NULL,
     unit_cost  DECIMAL(12,4) NULL,
-    UNIQUE KEY uq_sale_item (sale_id, item_id),
+    INDEX idx_sale_items_sale (sale_id),
     FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
     FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;

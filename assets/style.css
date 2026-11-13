@@ -349,7 +349,7 @@ input.total { color: var(--ink); font-size: 17px; font-weight: 600; font-variant
 
 .line {
     display: grid;
-    grid-template-columns: minmax(130px, 1fr) minmax(150px, 1.5fr) 76px 120px 104px 32px;
+    grid-template-columns: minmax(120px, 1fr) minmax(140px, 1.3fr) 76px 120px minmax(110px, 1fr) 32px;
     gap: 0 10px;
     align-items: start;
     padding-bottom: 10px;
@@ -358,6 +358,7 @@ input.total { color: var(--ink); font-size: 17px; font-weight: 600; font-variant
 }
 .line label { margin-bottom: 0; }
 .line-total { text-align: right; }
+.line-code { display: block; min-height: 1.2em; margin-top: 4px; color: var(--accent-deep); font-weight: 600; overflow-wrap: anywhere; }
 .line-total .field-label { margin-bottom: 5px; }
 .line-amount { display: block; line-height: 40px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .line-remove { margin-top: 28px; }
@@ -531,10 +532,9 @@ select.pill { width: auto; height: 30px; margin: 0; padding: 0 6px; border: 0; b
 }
 @media (max-width: 860px) {
     .line { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; position: relative; }
-    .line-desc { grid-column: span 2; order: 1; }
+    .line-no { grid-column: span 2; order: 1; }
     .line label:first-child { grid-column: span 2; padding-right: 40px; }
     .line > label, .line-total { order: 2; }
-    .line-desc { order: 2; }
     .line-total { grid-column: span 2; display: flex; justify-content: space-between; align-items: center; order: 3; }
     .line-total .field-label { margin: 0; }
     .line-remove { position: absolute; top: 0; right: 0; }

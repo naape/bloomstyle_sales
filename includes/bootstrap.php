@@ -250,6 +250,34 @@ function item_options(array $items, int $selected): string
     return $html;
 }
 
+/**
+ * Reads the numbers of the pieces on a sale line, such as "101" or "101, 102".
+ * A number typed with its item code (PHL9-101) is accepted too. Returns null when invalid.
+ */
+function parse_item_numbers(string $input, string $code): ?array
+{
+    $numbers = [];
+    foreach (preg_split('/[\s,]+/', $input, -1, PREG_SPLIT_NO_EMPTY) as $number) {
+        if (stripos($number, $code . '-') === 0) {
+            $number = substr($number, strlen($code) + 1);
+        }
+        if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9\/.-]{0,19}$/', $number)) {
+            return null;
+        }
+        $numbers[] = $number;
+    }
+    return $numbers;
+}
+
+/** An item code with its piece numbers, such as "PHL9-101, PHL9-102". */
+function item_label(string $code, string $item_no): string
+{
+    if ($item_no === '') {
+        return $code;
+    }
+    return implode(', ', array_map(fn($number) => $code . '-' . $number, explode(', ', $item_no)));
+}
+
 function slug(string $value): string
 {
     return strtolower(str_replace(' ', '-', $value));
@@ -369,6 +397,13 @@ function hero(string $title, string $subtitle, string $action = '', bool $compac
         . '<div><h1>' . h($title) . '</h1><p>' . h($subtitle) . '</p></div>' . $action . '</header>';
 }
 
+/** A link to a file in assets/ that changes whenever the file does, so browsers never keep an old copy. */
+function asset(string $file): string
+{
+    $path = __DIR__ . '/../assets/' . $file;
+    return 'assets/' . $file . (is_file($path) ? '?v=' . filemtime($path) : '');
+}
+
 function head_tags(string $title): void
 {
     ?>
@@ -376,8 +411,8 @@ function head_tags(string $title): void
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= h($title) ?> · Bloomstyle</title>
     <link rel="icon" type="image/png" href="assets/favicon.png">
-    <link rel="stylesheet" href="assets/style.css">
-    <script src="assets/app.js" defer></script>
+    <link rel="stylesheet" href="<?= asset('style.css') ?>">
+    <script src="<?= asset('app.js') ?>" defer></script>
     <?php
 }
 

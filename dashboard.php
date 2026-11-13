@@ -247,5 +247,5 @@ hero('Dashboard', 'How your store is doing, from sales to stock.', '', true);
     <?php endif; ?>
 </section>
 <div id="chart-tip" class="chart-tip" hidden></div>
-<script src="assets/dashboard.js" defer></script>
+<script src="<?= asset('dashboard.js') ?>" defer></script>
 <?php layout_bottom();

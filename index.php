@@ -32,8 +32,12 @@ $params = [];
 if (isset($filters['q'])) {
     $where[] = '(s.order_no LIKE ? OR s.invoice_no LIKE ? OR s.waybill_no LIKE ? OR s.customer_name LIKE ? OR s.mobile LIKE ? OR s.address LIKE ? OR s.city LIKE ?
                  OR EXISTS (SELECT 1 FROM sale_items si JOIN items i ON i.id = si.item_id
-                            WHERE si.sale_id = s.id AND (i.code LIKE ? OR i.description LIKE ?)))';
-    array_push($params, ...array_fill(0, 9, '%' . $filters['q'] . '%'));
+                            WHERE si.sale_id = s.id AND (i.code LIKE ? OR i.description LIKE ? OR si.item_no LIKE ?
+                                  OR (i.code = ? AND CONCAT(\', \', si.item_no, \',\') LIKE ?))))';
+    array_push($params, ...array_fill(0, 10, '%' . $filters['q'] . '%'));
+    // A full code such as PHL9-101 finds the sale that has piece 101 of PHL9.
+    $split = preg_match('/^(.+)-([^-]+)$/', $filters['q'], $part);
+    array_push($params, $split ? $part[1] : '', $split ? '%, ' . addcslashes($part[2], '%_\\') . ',%' : '');
 }
 if (isset($filters['cash'])) {
     $where[]  = 's.cash_status = ?';
@@ -81,7 +85,7 @@ $rows = $rows->fetchAll();
 $sale_lines = [];
 if ($rows) {
     $ids  = array_column($rows, 'id');
-    $find = db()->prepare('SELECT si.sale_id, si.qty, si.unit_price, i.code, i.description
+    $find = db()->prepare('SELECT si.sale_id, si.qty, si.unit_price, si.item_no, i.code, i.description
                            FROM sale_items si JOIN items i ON i.id = si.item_id
                            WHERE si.sale_id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')
                            ORDER BY si.id');
@@ -117,7 +121,7 @@ $tab_link  = fn(string $status) => '?' . h(http_build_query(($status ? ['status'
     <form method="get" class="filters">
         <?php if (isset($filters['status'])): ?><input type="hidden" name="status" value="<?= h($filters['status']) ?>"><?php endif; ?>
         <label class="grow">Search
-            <span class="search-field"><?= icon('search') ?><input type="search" name="q" value="<?= h($filters['q'] ?? '') ?>" placeholder="Order, invoice, waybill, name, mobile, address, city, item"></span>
+            <span class="search-field"><?= icon('search') ?><input type="search" name="q" value="<?= h($filters['q'] ?? '') ?>" placeholder="Order, invoice, waybill, name, mobile, address, city, item or PHL9-101"></span>
         </label>
         <label>Cash
             <select name="cash"><option value="">All</option><?= options(CASH_STATUSES, $filters['cash'] ?? '') ?></select>
@@ -168,7 +172,7 @@ $tab_link  = fn(string $status) => '?' . h(http_build_query(($status ? ['status'
                     <td class="medium">
                         <?php foreach ($sale_lines[$row['id']] as $line): ?>
                             <div class="sale-line">
-                                <span class="nowrap"><?= (int) $line['qty'] ?> × <?= h($line['code']) ?> <span class="line-price">@ <?= money($line['unit_price']) ?></span></span>
+                                <span class="nowrap"><?= (int) $line['qty'] ?> × <?= h(item_label($line['code'], $line['item_no'])) ?> <span class="line-price">@ <?= money($line['unit_price']) ?></span></span>
                                 <small><?= h($line['description']) ?></small>
                             </div>
                         <?php endforeach; ?>

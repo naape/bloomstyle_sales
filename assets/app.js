@@ -62,8 +62,22 @@ if (form?.dataset.entry === 'sale') {
 
     const showItem = (line) => {
         const option = field(line, 'item_id').selectedOptions[0];
-        line.querySelector('.line-description').value = option?.dataset.description ?? '';
-        line.querySelector('.line-stock').textContent = option?.value ? `In stock: ${option.dataset.stock}` : '';
+        line.querySelector('.line-stock').textContent = !option?.value ? ''
+            : `In stock: ${option.dataset.stock}${option.dataset.price ? '' : ' · No selling price set'}`;
+        field(line, 'unit_price').placeholder = option?.value && !option.dataset.price ? 'Enter price' : '';
+        showCode(line);
+    };
+
+    // Shows the full code the line will be saved with, such as PHL9-101.
+    const fullCodes = (line) => {
+        const code = field(line, 'item_id').selectedOptions[0]?.textContent ?? '';
+        const prefix = `${code}-`.toLowerCase();
+        return field(line, 'item_no').value.split(/[\s,]+/).filter(Boolean)
+            .map((number) => `${code}-${number.toLowerCase().startsWith(prefix) ? number.slice(prefix.length) : number}`);
+    };
+    const showCode = (line) => {
+        const codes = field(line, 'item_id').value ? fullCodes(line) : [];
+        line.querySelector('.line-code').textContent = codes.length ? codes.join(', ') : '';
     };
 
     const updateTotals = () => {
@@ -82,7 +96,8 @@ if (form?.dataset.entry === 'sale') {
                 const row = document.createElement('li');
                 const name = document.createElement('span');
                 const value = document.createElement('span');
-                name.textContent = `${qty} × ${option.dataset.description}`;
+                const codes = fullCodes(line);
+                name.textContent = `${qty} × ${option.dataset.description}${codes.length ? ` (${codes.join(', ')})` : ''}`;
                 value.textContent = format(lineTotal);
                 row.append(name, value);
                 summary.append(row);
@@ -122,7 +137,10 @@ if (form?.dataset.entry === 'sale') {
         field(added, 'item_id').focus();
     });
 
-    form.addEventListener('input', updateTotals);
+    form.addEventListener('input', (event) => {
+        if (event.target.name === 'item_no[]') showCode(event.target.closest('.line'));
+        updateTotals();
+    });
 
     const district = form.elements.district;
     const showProvince = () => { form.elements.province.value = district.selectedOptions[0]?.dataset.province ?? ''; };

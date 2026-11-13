@@ -64,8 +64,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <?php head_tags('Two-factor authentication'); ?>
     <?php if ($setup): ?>
-        <script src="assets/qrcode.js" defer></script>
-        <script src="assets/two_factor.js" defer></script>
+        <script src="<?= asset('qrcode.js') ?>" defer></script>
+        <script src="<?= asset('two_factor.js') ?>" defer></script>
     <?php endif; ?>
 </head>
 <body class="login-page">
